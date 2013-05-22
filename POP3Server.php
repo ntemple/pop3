@@ -208,7 +208,7 @@ class POP3Server {
      * High level logic to read all the messages off the server,
      * process them, and return the message list.
      *
-     * @param $class - the name of a class that takes a ($id, $subject, $message) in the constructor
+     * @param $class - the name of a class that takes a ($id, $message) in the constructor, with optional process() method
      * @param bool $delete - automatically delete the message after retrieval. Defaults to true.
      * @return array - a list of $class objects, each containing a message from the server.
      * @throws POP3Exception
@@ -231,6 +231,7 @@ class POP3Server {
         }
         $this->cmd_QUIT();
 
+        // Cycle through each messages, calling their process() method if it exists.
         foreach ($messages as $message) {
             if (is_callable(array($message, 'process'))) {
                 $message->process();
