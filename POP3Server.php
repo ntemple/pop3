@@ -44,7 +44,6 @@ class POP3Server {
      * @param int $timeout
      * @throws POP3Exception
      */
-
     public function connect($timeout = 30) {
 
         $errno = 0;
@@ -74,7 +73,6 @@ class POP3Server {
      *
      * @param $msg
      */
-
     protected function writeLog($msg) {
         if ($this->debug)
             $this->logbuffer .= "$msg\n";
@@ -85,7 +83,6 @@ class POP3Server {
      * @param $buffer
      * @return bool|null
      */
-
     private function readln(&$buffer) {
 
         $buffer = fgets($this->fd, $this->bufferSize);
@@ -101,7 +98,6 @@ class POP3Server {
      * write a command line
      * @param $msg
      */
-
     private function writeln($msg) {
         $this->writelog($msg);
         fwrite($this->fd, "$msg\r\n");
@@ -111,11 +107,10 @@ class POP3Server {
      * Read a series of lines, terminated by a period.
      * @return string
      */
-
     private function read() {
 
         $buffer = '';
-
+		
         while (!feof($this->fd)) {
             $line = fgets($this->fd, $this->bufferSize);
             if (chop($line) == '.') break;
@@ -135,10 +130,10 @@ class POP3Server {
      * @return string
      * @throws POP3Exception
      */
-
     protected function cmd($cmd) {
         $buffer = '';
-
+		//echo("cmd(): ".$cmd."<br/>");		// uncomment this line to display command requests when testing
+		
         $this->writeln($cmd);
         $result = $this->readln($buffer);
         if ($result !== true) {
@@ -155,13 +150,20 @@ class POP3Server {
      *  POP3 Command Implementation
      */
 
-
+	/**
+     * POP3 command for ending the session.
+     */
     public function cmd_QUIT() {
         $this->writeln('QUIT');
         fclose($this->fd);
         $this->fd = null;
     }
-
+	
+	/**
+     * POP3 command for showing the number of messages and size of bytes.
+     *
+     * @return array - a "tuple" containing the number of messages ($number) and the size in bytes ($size)
+     */
     public function cmd_STAT() {
 
         $buffer = $this->cmd('STAT');
@@ -170,7 +172,14 @@ class POP3Server {
 
         return array($number, $size);
     }
-
+	
+	/**
+     * POP3 command for retrieving a list of messages with their IDs.
+     *
+     * @param $id - the id of the message to be retrieved
+     * @param $auto_delete - automatically delete the message after retrieval. Defaults to false.
+     * @return array - a list containing pieces of information from the header
+     */
     public function cmd_LIST() {
 
         $this->cmd('LIST');
@@ -186,7 +195,35 @@ class POP3Server {
         unset($messages['']);
         return $messages;
     }
-
+	
+	/**
+     * POP3 command for retrieving a messages header.
+     *
+     * @param $id - the id of the message to be retrieved
+     * @param $auto_delete - automatically delete the message after retrieval. Defaults to false.
+     * @return array - a list containing pieces of information from the header
+     */
+	public function cmd_TOP($id, $auto_delete = false) {
+		
+        $this->cmd('TOP '.$id.' 0');
+        $buffer = $this->read();
+        $header = explode("\n", $buffer);
+		if ($auto_delete) {
+            $this->cmd_DELE($id);
+		}
+		
+        unset($header['']);
+        return $header;
+    }
+	
+	
+	/**
+     * POP3 command for retrieving a messages contents.
+     *
+     * @param $id - the id of the message to be retrieved
+     * @param $auto_delete - automatically delete the message after retrieval. Defaults to false.
+     * @return array - a list containing pieces of information about the message
+     */
     public function cmd_RETR($id, $auto_delete = false) {
         $this->cmd("RETR $id");
         $message = $this->read();
@@ -195,11 +232,19 @@ class POP3Server {
         }
         return $message;
     }
-
+	
+	/**
+     * POP3 command for retrieving a messages contents.
+     *
+     * @param $id - the id of the message to be deleted
+     */
     public function cmd_DELE($id) {
         $this->cmd("DELE $id");
     }
-
+	
+	/**
+     * POP3 command that resets the session to its initial state.
+     */
     public function cmd_RSET() {
         $this->cmd("RSET");
     }
@@ -209,11 +254,12 @@ class POP3Server {
      * process them, and return the message list.
      *
      * @param $class - the name of a class that takes a ($id, $message) in the constructor, with optional process() method
-     * @param bool $delete - automatically delete the message after retrieval. Defaults to true.
-     * @return array - a list of $class objects, each containing a message from the server.
+     * @param bool $delete - automatically delete the message after retrieval. Defaults to false.
+     * @param bool $headers - retrieves headers instead of full messages if true. Defaults to false.
+	 * @return array - a list of $class objects, each containing a message from the server.
      * @throws POP3Exception
      */
-    public function processMessages($class = 'POP3Message', $delete = true) {
+    public function processMessages($class = 'POP3Message', $delete = false, $headers = false) {
 
         $this->connect();
 
@@ -225,9 +271,15 @@ class POP3Server {
 
         $this->connect();
         $messageList = $this->cmd_LIST();
+
         foreach ($messageList as $id => $size) {
-            $message = $this->cmd_RETR($id, $delete);
-            $messages[] = new $class($id, $message);
+            if ($headers) {
+				$message = $this->cmd_TOP($id, $delete);
+			} else {
+				$message = $this->cmd_RETR($id, $delete);
+			}
+            
+			$messages[] = new $class($id, $message);
         }
         $this->cmd_QUIT();
 
@@ -241,7 +293,6 @@ class POP3Server {
         return $messages;
     }
 }
-
 
 class POP3Exception extends Exception {
 }
@@ -258,7 +309,6 @@ class POP3Message {
      * @param $id
      * @param $message
      */
-
     function __construct($id, $message) {
         $this->id = $id;
         $this->message = $message;
@@ -277,3 +327,4 @@ class POP3Message {
     }
 }
 
+?>
