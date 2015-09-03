@@ -20,3 +20,5 @@ try {
 
 ```
 
+Just a note about using Gmail. You will have to go to https://www.google.com/settings/security/lesssecureapps and allow access from less secure apps.
+Also Google will only let you grab all your emails once. To circumvent this you can use recent:email@gmail.com (which will only grab emails from the past 30 days) or use a service that allows insecure access (like juno.com).
